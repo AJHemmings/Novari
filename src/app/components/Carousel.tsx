@@ -238,7 +238,6 @@ const Carousel = ({ userProfile }: { userProfile: Profile }) => {
       position: absolute;
       visibility: visible;
       background-color: #ffffff; /* White background as requested */
-      opacity:2%;
       min-width: 250px;
       max-width: 300px;
       border-radius: 12px; /* Rounded corners like Novari UI */
@@ -483,16 +482,14 @@ const Carousel = ({ userProfile }: { userProfile: Profile }) => {
     setTimeout(() => {
       // Check if elements exist before starting the tutorial
       const heroElement = document.getElementById("hero");
-      const completeElement = document.getElementById("complete");
       const prevBtnElement = document.getElementById("prevBtn");
       const nextBtnElement = document.getElementById("nextBtn");
 
-      if (heroElement && completeElement && prevBtnElement && nextBtnElement) {
+      if (heroElement && prevBtnElement && nextBtnElement) {
         intro.start();
       } else {
         console.error("Required DOM elements for tutorial not found:", {
           hero: !!heroElement,
-          complete: !!completeElement,
           prevBtn: !!prevBtnElement,
           nextBtn: !!nextBtnElement,
         });
