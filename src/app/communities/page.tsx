@@ -3,7 +3,12 @@
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import CommunityCard from "../components/CommunityCard";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
+import { useRouter } from "next/navigation";
+import StreakCounter from "../components/StreakCounter";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { User } from "@supabase/supabase-js";
 
 interface Community {
   id: number;
@@ -15,6 +20,9 @@ interface Community {
 }
 
 export default function Communities() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const [communities, setCommunities] = useState<Community[]>([]);
   const [selectedEmberType, setSelectedEmberType] = useState<string>("");
   const [selectedRegion, setSelectedRegion] = useState<string>(""); // New state for region filter
@@ -23,6 +31,18 @@ export default function Communities() {
 
   // Available regions
   const regions = ["Online", "London", "West Midlands", "Somerset"];
+
+  useEffect(() => {
+    const supabase = createClientComponentClient();
+
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
 
   useEffect(() => {
     async function fetchCommunities() {
@@ -74,9 +94,66 @@ export default function Communities() {
     `;
   };
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUser = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      const user = data?.session?.user || null;
+
+      if (error) {
+        console.error("Error fetching user:", error);
+      }
+
+      if (isMounted) {
+        setUser(user);
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Error signing out:", error);
+    } else {
+      router.replace("/auth/signin");
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
+
+  if (!user) {
+    return null; // Prevent rendering before redirecting
+  }
+
   return (
     <div className="bg-custom-green min-h-screen text-white flex flex-col">
-      <Header />
+      <Header user={user ?? undefined} />
+      <div className="absolute top-4 left-4">
+        <button
+          onClick={handleLogout}
+          className="bg-emerald-700 text-white px-4 py-2 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+        >
+          Logout
+        </button>
+      </div>
+      <div className="fixed top-4 right-4 z-10 md:hidden">
+        {user && <StreakCounter user={user} />}
+      </div>
+
       <div className="container mx-auto py-6 px-4 pt-30 pb-30 flex-grow">
         <h2 className="text-5xl text-center text-custom-white font-bold mb-4">
           Communities
@@ -213,6 +290,7 @@ export default function Communities() {
           </>
         )}
       </div>
+
       <Footer />
     </div>
   );

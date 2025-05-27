@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
+import { useRouter } from "next/navigation";
+import { User } from "@supabase/supabase-js";
 import { FormEvent } from "react";
 import { ToastContainer, toast } from "react-toastify";
 
@@ -14,6 +16,9 @@ const predefinedEmberOptions = [
 ];
 
 export default function UserProfile() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const [emberOptions] = useState<string[]>(predefinedEmberOptions);
   const [selectedEmbers, setSelectedEmbers] = useState<string[]>([]);
   const [firstName, setFirstName] = useState<string>("");
@@ -115,6 +120,51 @@ export default function UserProfile() {
     toast.error("Failed to save - check console");
   };
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUser = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      const user = data?.session?.user || null;
+
+      if (error) {
+        console.error("Error fetching user:", error);
+      }
+
+      if (isMounted) {
+        setUser(user);
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/auth/signin");
+    }
+  }, [loading, user, router]);
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Error signing out:", error);
+    } else {
+      router.replace("/auth/signin");
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
+
+  if (!user) {
+    return null; // Prevent rendering before redirecting
+  }
+
   return (
     <div className="bg-custom-green min-h-screen pt-20">
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -122,7 +172,14 @@ export default function UserProfile() {
           <h1 className="text-2xl font-bold text-custom-white mb-6">
             User Profile
           </h1>
-
+          <div className="absolute top-4 left-4">
+            <button
+              onClick={handleLogout}
+              className="bg-emerald-700 text-white px-4 py-2 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              Logout
+            </button>
+          </div>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
