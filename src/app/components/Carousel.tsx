@@ -24,6 +24,7 @@ const Carousel = ({ userProfile }: { userProfile: Profile }) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [skipAnimation, setSkipAnimation] = useState(false);
   const [cards, setCards] = useState<Task[]>([]);
+  const [completedTaskIds, setCompletedTaskIds] = useState<number[]>([]);
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -58,7 +59,22 @@ const Carousel = ({ userProfile }: { userProfile: Profile }) => {
     fetchTasks();
   }, [userProfile]);
 
-  const handleComplete = (id: number) => {
+  // Fetch completed tasks for this user
+  useEffect(() => {
+    const fetchCompletedTasks = async () => {
+      if (!userProfile) return;
+      const { data, error } = await supabase
+        .from("completed_tasks")
+        .select("task_id")
+        .eq("user_id", userProfile.id);
+      if (!error && data) {
+        setCompletedTaskIds(data.map((row) => row.task_id));
+      }
+    };
+    fetchCompletedTasks();
+  }, [userProfile, cards.length]);
+
+  const handleComplete = async (id: number) => {
     console.log(id);
     const modifiedCards = cards.map((card) => {
       if (card.id !== id) {
@@ -72,6 +88,20 @@ const Carousel = ({ userProfile }: { userProfile: Profile }) => {
     });
 
     setCards(modifiedCards);
+
+    // Add to completed_tasks in supabase
+    if (!userProfile) return;
+    const { error } = await supabase.from("completed_tasks").insert([
+      {
+        user_id: userProfile.id,
+        task_id: id,
+      },
+    ]);
+    if (!error) {
+      setCompletedTaskIds((prev) => [...prev, id]);
+    } else {
+      console.error("Error saving completed task:", error);
+    }
   };
 
   const handleNext = () => {
@@ -135,6 +165,8 @@ const Carousel = ({ userProfile }: { userProfile: Profile }) => {
           {cards.map((card, index) => {
             const radius = 265;
             const isActive = index === currentIndex % cards.length;
+            const isCompleted =
+              card.completed || completedTaskIds.includes(card.id);
 
             return (
               <div
@@ -160,15 +192,15 @@ const Carousel = ({ userProfile }: { userProfile: Profile }) => {
                 <button
                   id={isActive ? "complete" : ""}
                   onClick={() => handleComplete(card.id)}
-                  disabled={card.completed}
+                  disabled={isCompleted}
                   className={`mt-4 py-3 px-6 rounded-lg self-center transition-all duration-300 
                     ${
-                      card.completed
+                      isCompleted
                         ? "bg-green-100 text-green-800 cursor-not-allowed"
                         : "bg-emerald-700 hover:bg-emerald-800 text-custom-white"
                     } font-semibold flex items-center gap-2`}
                 >
-                  {card.completed ? (
+                  {isCompleted ? (
                     <>
                       <Check className="text-green-600" size={20} />
                       <span>Completed</span>

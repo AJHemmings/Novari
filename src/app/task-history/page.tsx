@@ -13,35 +13,16 @@ interface CompletedTasks {
   taskInstructions: string;
 }
 
-const completedTasks: CompletedTasks[] = [
-  {
-    id: 1,
-    emberType: "Self-Awareness & Mindset",
-    taskInstructions: "Write down one thing you're proud of today.",
-  },
-  {
-    id: 2,
-    emberType: "Self-Awareness & Mindset",
-    taskInstructions:
-      "Take 5 minutes for a mindfulness exercise to connect with your thoughts.",
-  },
-  {
-    id: 3,
-    emberType: "Self-Awareness & Mindset",
-    taskInstructions:
-      "Reflect on a challenging situation today—what did you learn from it?",
-  },
-  {
-    id: 4,
-    emberType: "Self-Awareness & Mindset",
-    taskInstructions:
-      "Reflect on a challenging situation today—what did you learn from it?",
-  },
-];
+interface Task {
+  id: number;
+  "Ember Type": string;
+  "Task Instructions": string;
+}
 
 export default function TaskHistory() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [completedTasks, setCompletedTasks] = useState<CompletedTasks[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -73,6 +54,53 @@ export default function TaskHistory() {
       router.replace("/auth/signin");
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    const fetchCompletedTasks = async () => {
+      if (!user) return;
+      // Step 1: Get completed task IDs
+      const { data: completed, error } = await supabase
+        .from("completed_tasks")
+        .select("id, task_id")
+        .eq("user_id", user.id)
+        .order("completed_at", { ascending: false });
+      if (error || !completed) return;
+
+      const taskIds = completed.map((row) => row.task_id);
+      if (taskIds.length === 0) {
+        setCompletedTasks([]);
+        return;
+      }
+
+      // Step 2: Get task details for those IDs
+      const { data: tasks, error: tasksError } = await supabase
+        .from("Tasks")
+        .select('id, "Ember Type", "Task Instructions"')
+        .in("id", taskIds);
+
+      if (tasksError || !tasks) {
+        setCompletedTasks([]);
+        return;
+      }
+
+      // Map completed tasks to include task details
+      const completedWithDetails = completed
+        .map((row) => {
+          const task = (tasks as Task[]).find((t) => t.id === row.task_id);
+          return task
+            ? {
+                id: row.id,
+                emberType: task["Ember Type"],
+                taskInstructions: task["Task Instructions"],
+              }
+            : null;
+        })
+        .filter((x): x is CompletedTasks => x !== null);
+
+      setCompletedTasks(completedWithDetails);
+    };
+    fetchCompletedTasks();
+  }, [user]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
